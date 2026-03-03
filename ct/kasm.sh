@@ -30,8 +30,38 @@ function update_script() {
     exit
   fi
 
-  msg_info "Checking for new version"
-  CURRENT_VERSION=$(readlink -f /opt/kasm/current | awk -F'/' '{print $4}')
+  # msg_info "Checking for new version"
+  # CURRENT_VERSION=$(readlink -f /opt/kasm/current | awk -F'/' '{print $4}')
+  # KASM_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_[0-9]+\.[0-9]+\.[0-9]+\.[a-z0-9]+\.tar\.gz' | head -n 1)
+  # if [[ -z "$KASM_URL" ]]; then
+  #   SERVICE_IMAGE_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_service_images_amd64_[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' | head -n 1)
+  #   if [[ -n "$SERVICE_IMAGE_URL" ]]; then
+  #     KASM_VERSION=$(echo "$SERVICE_IMAGE_URL" | sed -E 's/.*kasm_release_service_images_amd64_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+  #     KASM_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_${KASM_VERSION}.tar.gz"
+  #   fi
+  # else
+  #   KASM_VERSION=$(echo "$KASM_URL" | sed -E 's/.*kasm_release_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+  # fi
+  
+  # if [[ -z "$KASM_URL" ]] || [[ -z "$KASM_VERSION" ]]; then
+  #   msg_error "Unable to detect latest Kasm release URL."
+  #   exit 250
+  # fi
+  # msg_info "Checked for new version"
+
+msg_info "Checking for new version"
+CURRENT_VERSION=$(readlink -f /opt/kasm/current | awk -F'/' '{print $4}')
+
+# Optional override: pin a specific release tarball.
+# Example:
+# export KASM_TARBALL_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_1.16.0.a1d5b7.tar.gz"
+KASM_TARBALL_URL="${KASM_TARBALL_URL:-}"
+
+if [[ -n "$KASM_TARBALL_URL" ]]; then
+  KASM_URL="$KASM_TARBALL_URL"
+  # Extract 1.16.0 from either kasm_release_1.16.0.<hash>.tar.gz or kasm_release_1.16.0.tar.gz
+  KASM_VERSION="$(echo "$KASM_URL" | sed -E 's/.*kasm_release_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
+else
   KASM_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_[0-9]+\.[0-9]+\.[0-9]+\.[a-z0-9]+\.tar\.gz' | head -n 1)
   if [[ -z "$KASM_URL" ]]; then
     SERVICE_IMAGE_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_service_images_amd64_[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' | head -n 1)
@@ -42,12 +72,23 @@ function update_script() {
   else
     KASM_VERSION=$(echo "$KASM_URL" | sed -E 's/.*kasm_release_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
   fi
-  
-  if [[ -z "$KASM_URL" ]] || [[ -z "$KASM_VERSION" ]]; then
-    msg_error "Unable to detect latest Kasm release URL."
-    exit 250
+fi
+
+# Safety checks
+if [[ -z "$KASM_URL" ]] || [[ -z "$KASM_VERSION" ]]; then
+  msg_error "Unable to determine Kasm release URL/version."
+  exit 250
+fi
+
+# Optional: validate the tarball actually exists when pinned
+if [[ -n "$KASM_TARBALL_URL" ]]; then
+  if ! curl -fsSI "$KASM_URL" >/dev/null; then
+    msg_error "Pinned KASM_TARBALL_URL is not reachable: $KASM_URL"
+    exit 251
   fi
-  msg_info "Checked for new version"
+fi
+
+msg_info "Checked for new version"
 
   msg_info "Removing outdated docker-compose plugin"
   [ -f ~/.docker/cli-plugins/docker-compose ] && rm -rf ~/.docker/cli-plugins/docker-compose

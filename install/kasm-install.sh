@@ -17,23 +17,62 @@ msg_info "Installing Docker"
 $STD sh <(curl -fsSL https://get.docker.com/)
 msg_ok "Installed Docker"
 
-msg_info "Detecting latest Kasm Workspaces release"
-KASM_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_[0-9]+\.[0-9]+\.[0-9]+\.[a-z0-9]+\.tar\.gz' | head -n 1)
-if [[ -z "$KASM_URL" ]]; then
-  SERVICE_IMAGE_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_service_images_amd64_[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' | head -n 1)
-  if [[ -n "$SERVICE_IMAGE_URL" ]]; then
-    KASM_VERSION=$(echo "$SERVICE_IMAGE_URL" | sed -E 's/.*kasm_release_service_images_amd64_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
-    KASM_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_${KASM_VERSION}.tar.gz"
-  fi
+# msg_info "Detecting latest Kasm Workspaces release"
+# KASM_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_[0-9]+\.[0-9]+\.[0-9]+\.[a-z0-9]+\.tar\.gz' | head -n 1)
+# if [[ -z "$KASM_URL" ]]; then
+#   SERVICE_IMAGE_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_service_images_amd64_[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' | head -n 1)
+#   if [[ -n "$SERVICE_IMAGE_URL" ]]; then
+#     KASM_VERSION=$(echo "$SERVICE_IMAGE_URL" | sed -E 's/.*kasm_release_service_images_amd64_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+#     KASM_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_${KASM_VERSION}.tar.gz"
+#   fi
+# else
+#   KASM_VERSION=$(echo "$KASM_URL" | sed -E 's/.*kasm_release_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+# fi
+
+# if [[ -z "$KASM_URL" ]] || [[ -z "$KASM_VERSION" ]]; then
+#   msg_error "Unable to detect latest Kasm release URL."
+#   exit 250
+# fi
+# msg_ok "Detected Kasm Workspaces version $KASM_VERSION"
+
+msg_info "Detecting Kasm Workspaces release"
+
+# Optional override: pin a specific release tarball.
+# Example:
+# export KASM_TARBALL_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_1.16.0.a1d5b7.tar.gz"
+KASM_TARBALL_URL="${KASM_TARBALL_URL:-}"
+
+if [[ -n "$KASM_TARBALL_URL" ]]; then
+  KASM_URL="$KASM_TARBALL_URL"
+  # Extract 1.16.0 from either kasm_release_1.16.0.<hash>.tar.gz or kasm_release_1.16.0.tar.gz
+  KASM_VERSION="$(echo "$KASM_URL" | sed -E 's/.*kasm_release_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
 else
-  KASM_VERSION=$(echo "$KASM_URL" | sed -E 's/.*kasm_release_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+  KASM_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_[0-9]+\.[0-9]+\.[0-9]+\.[a-z0-9]+\.tar\.gz' | head -n 1)
+  if [[ -z "$KASM_URL" ]]; then
+    SERVICE_IMAGE_URL=$(curl -fsSL "https://www.kasm.com/downloads" | tr '\n' ' ' | grep -oE 'https://kasm-static-content[^"]*kasm_release_service_images_amd64_[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' | head -n 1)
+    if [[ -n "$SERVICE_IMAGE_URL" ]]; then
+      KASM_VERSION=$(echo "$SERVICE_IMAGE_URL" | sed -E 's/.*kasm_release_service_images_amd64_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+      KASM_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_${KASM_VERSION}.tar.gz"
+    fi
+  else
+    KASM_VERSION=$(echo "$KASM_URL" | sed -E 's/.*kasm_release_([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+  fi
 fi
 
 if [[ -z "$KASM_URL" ]] || [[ -z "$KASM_VERSION" ]]; then
-  msg_error "Unable to detect latest Kasm release URL."
+  msg_error "Unable to determine Kasm release URL/version."
   exit 250
 fi
-msg_ok "Detected Kasm Workspaces version $KASM_VERSION"
+
+# Optional: validate the tarball actually exists when pinned
+if [[ -n "$KASM_TARBALL_URL" ]]; then
+  if ! curl -fsSI "$KASM_URL" >/dev/null; then
+    msg_error "Pinned KASM_TARBALL_URL is not reachable: $KASM_URL"
+    exit 251
+  fi
+fi
+
+msg_ok "Using Kasm Workspaces version $KASM_VERSION"
 
 msg_warn "WARNING: This script will run an external installer from a third-party source (https://www.kasmweb.com/)."
 msg_warn "The following code is NOT maintained or audited by our repository."
