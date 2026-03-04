@@ -40,7 +40,10 @@ msg_info "Detecting Kasm Workspaces release"
 # Optional override: pin a specific release tarball.
 # Example:
 # export KASM_TARBALL_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_1.16.0.a1d5b7.tar.gz"
-KASM_TARBALL_URL="${KASM_TARBALL_URL:-}"
+#KASM_TARBALL_URL="${KASM_TARBALL_URL:-}"
+
+# Force a specific Kasm tarball (leave empty to auto-detect latest)
+KASM_TARBALL_URL="https://kasm-static-content.s3.amazonaws.com/kasm_release_1.16.0.a1d5b7.tar.gz"
 
 if [[ -n "$KASM_TARBALL_URL" ]]; then
   KASM_URL="$KASM_TARBALL_URL"
